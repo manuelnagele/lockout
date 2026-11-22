@@ -16,6 +16,11 @@ jobs:
         with:
           repository: manuelnagele/deadbeat
           path: deadbeat
+      # ... and the shared test harness from ../deadbeat-spec
+      - uses: actions/checkout@v4
+        with:
+          repository: manuelnagele/deadbeat-spec
+          path: deadbeat-spec
       - name: Install LuaJIT
         run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit
       - name: Unit tests
