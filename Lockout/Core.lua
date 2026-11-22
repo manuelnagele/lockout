@@ -76,11 +76,16 @@ function Core.prune(entries, now)
     return keep
 end
 
--- {hourUsed, hourLeft, nextFree (epoch or nil), dayUsed, dayLeft, estimated}
+-- {hourUsed, hourLeft, nextFree (epoch or nil), dayUsed, dayLeft, dayFree (epoch: when the day's oldest entry
+-- frees a slot, only with none left today), estimated}
 function Core.status(entries, now)
     local hour, day, nextFree, estimated = 0, 0, nil, false
+    local oldest
     for _, e in ipairs(entries) do
-        if now - e.t < Core.DAY then day = day + 1 end
+        if now - e.t < Core.DAY then
+            day = day + 1
+            if not oldest or e.t < oldest then oldest = e.t end
+        end
         local free = Core.freeAt(e)
         if now < free then
             hour = hour + 1
@@ -89,10 +94,20 @@ function Core.status(entries, now)
         end
     end
     local left = math.max(0, Core.PER_HOUR - hour)
+    local dayLeft = math.max(0, Core.PER_DAY - day)
     return {
-        hourUsed = hour, hourLeft = left, dayUsed = day, dayLeft = math.max(0, Core.PER_DAY - day),
+        hourUsed = hour, hourLeft = left, dayUsed = day, dayLeft = dayLeft,
+        dayFree = (dayLeft == 0 and oldest) and (oldest + Core.DAY + Core.MARGIN) or nil,
         nextFree = nextFree, estimated = estimated,
     }
+end
+
+-- Can you enter now, and if not, when? The hour and the day both have to allow it.
+-- Returns free (bool), at (epoch or nil), why ("hour" | "day" | nil)
+function Core.verdict(s)
+    if s.dayLeft == 0 then return false, s.dayFree, "day" end
+    if s.hourLeft == 0 then return false, s.nextFree, "hour" end
+    return true, nil, nil
 end
 
 -- The game said "too many instances": at least PER_HOUR entries happened in the last hour. Pad with

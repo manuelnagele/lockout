@@ -2,7 +2,7 @@
 -- Public API for other addons: Lockout.Status() -> see Core.status. A Deadbeat module (spec 2.0).
 local ADDON, ns = ...
 local Core = ns.Core
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 local db, char
 local current          -- zone name of the instance we're in, or nil
@@ -74,13 +74,16 @@ local function drawPips()
     local P = K.P
     local now = GetServerTime and GetServerTime() or time()
     for i, pip in ipairs(badge.pips) do
-        local c = s.hourLeft == 0 and K.RED or (i <= s.hourLeft and P.goldOn or P.bronze1)
+        local c = (s.hourLeft == 0 or s.dayLeft == 0) and K.RED or (i <= s.hourLeft and P.goldOn or P.bronze1)
         pip:SetVertexColor(c[1], c[2], c[3], 1)
         pip.glow:Stop()
     end
     -- with 1 or 0 left (or while watching another character): the countdown to the next free slot, as an item
     if nextItem then
-        if (s.hourLeft <= 1 or other) and s.nextFree then
+        if s.dayLeft == 0 and s.dayFree then              -- the day's 30 are used: that wait is the one that counts
+            nextItem:Set("day " .. Core.countdown(s.dayFree - now), "bad")
+            nextItem:Show()
+        elseif (s.hourLeft <= 1 or other) and s.nextFree then
             nextItem:Set((s.estimated and "~" or "") .. Core.countdown(s.nextFree - now), s.hourLeft == 0 and "bad" or "warn")
             nextItem:Show()
         else
@@ -139,15 +142,19 @@ local function drawBig()
     local K = Deadbeat.kit
     local s = Lockout.Status(who)
     local t = now()
-    local free = s.hourLeft > 0
+    -- free only if both the hour (5) and the day (30) allow another entry
+    local free, at, why = Core.verdict(s)
     local c = free and K.GREEN or K.RED
     big.fill:SetVertexColor(c[1], c[2], c[3], 0.55)
     if free then
         big.title:SetText("|cffffffffINSTANCE FREE|r")
         big.sub:SetText(("%s  ·  %d of %d free"):format(label(who), s.hourLeft, PIPS))
+    elseif why == "day" then
+        big.title:SetText(("|cffffffffDAILY LIMIT  %s|r"):format(at and Core.countdown(at - t) or ""))
+        big.sub:SetText(("%s  ·  %d today  ·  frees at %s"):format(label(who), s.dayUsed, at and Core.clockTime(at) or "?"))
     else
-        big.title:SetText(("|cffffffffWAIT  %s%s|r"):format(s.estimated and "~" or "", Core.countdown(s.nextFree - t)))
-        big.sub:SetText(("%s  ·  frees at %s"):format(label(who), Core.clockTime(s.nextFree)))
+        big.title:SetText(("|cffffffffWAIT  %s%s|r"):format(s.estimated and "~" or "", Core.countdown(at - t)))
+        big.sub:SetText(("%s  ·  frees at %s"):format(label(who), Core.clockTime(at)))
     end
     if free and wasFree == false then
         big.flash:Stop() big.flash:Play()
@@ -172,7 +179,9 @@ local pending          -- {zone, map, t, counted, entry, prev}: an entry waiting
 
 local function announce()
     local s = Lockout.Status()
-    if s.hourLeft == 1 then
+    if s.dayLeft == 0 then
+        print_(("no instances left today (30) — the next frees at %s."):format(s.dayFree and Core.clockTime(s.dayFree) or "?"))
+    elseif s.hourLeft == 1 then
         print_("one instance left this hour.")
     elseif s.hourLeft == 0 then
         print_(("no instances left — next one free at %s."):format(Core.clockTime(s.nextFree)))
@@ -397,19 +406,22 @@ handlers.CHAT_MSG_SYSTEM = onSystem
 function handlers.PLAYER_CAMPING()
     if not char or not current then return end
     local st = Lockout.Status()
-    if not st or st.hourLeft > 1 then return end
+    if not st or (st.hourLeft > 1 and st.dayLeft > 1) then return end
     local msg
-    if st.hourLeft == 0 then
-        msg = ("Lockout: no free instance until %s (in %s) — a reset now puts you outside"):format(
-            Core.clockTime(st.nextFree), Core.countdown(st.nextFree - now()))
+    local free, at, why = Core.verdict(st)
+    if not free then
+        msg = ("Lockout: no free instance %suntil %s (in %s) — a reset now puts you outside"):format(
+            why == "day" and "today, " or "", Core.clockTime(at), Core.countdown(at - now()))
+    elseif st.dayLeft == 1 then
+        msg = "Lockout: the last instance of the day (30) — after this reset you can't enter again today"
     else
         msg = ("Lockout: last free instance — after this reset, the next frees at %s"):format(Core.clockTime(st.nextFree))
     end
     if RaidNotice_AddMessage and RaidWarningFrame then
-        RaidNotice_AddMessage(RaidWarningFrame, msg, st.hourLeft == 0 and { r = 1, g = 0.35, b = 0.3 } or { r = 1, g = 0.82, b = 0.25 })
+        RaidNotice_AddMessage(RaidWarningFrame, msg, not free and { r = 1, g = 0.35, b = 0.3 } or { r = 1, g = 0.82, b = 0.25 })
     end
     print_(msg)
-    if st.hourLeft == 0 then pcall(PlaySound, SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959, "Master") end
+    if not free then pcall(PlaySound, SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959, "Master") end
 end
 handlers.NAME_PLATE_UNIT_ADDED = sawUnit
 handlers.UPDATE_MOUSEOVER_UNIT = function() sawUnit("mouseover") end
