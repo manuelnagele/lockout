@@ -13,9 +13,11 @@ ev:_fire("ADDON_LOADED", "Lockout")
 ev:_fire("PLAYER_LOGIN")
 ev:_fire("PLAYER_ENTERING_WORLD", true)
 for _, t in ipairs(W.tickers) do t() end
-DeadbeatBar:_script("OnEnter")
-local joined = table.concat(W.tipLines, "\n")
-assert(joined:find("Instances"), "Lockout's tooltip section: " .. joined)
+local function item(id) for _, it in ipairs(Deadbeat.Items()) do if it.key == "Lockout." .. id then return it end end end
+assert(item("slots") and item("slots").kind == "widget", "the diamonds are a widget item")
+assert(item("next") and not item("next").wanted, "no countdown with 5 slots free")
+local joined = W.tooltip(item("slots"))
+assert(joined:find("This character"), "Lockout's tooltip: " .. joined)
 -- logging out inside a dungeon with no slot left: a warning
 function IsInInstance() return true, "party" end
 function GetInstanceInfo() return "Maraudon", "party", 1, "", 5, 0, false, 349 end
@@ -28,8 +30,8 @@ function PlaySound() end
 ev:_fire("PLAYER_CAMPING")
 assert(warned and warned:find("no free instance"), "logout warning: " .. tostring(warned))
 for _, t in ipairs(W.tickers) do t() end
-DeadbeatBar:_script("OnEnter")
-assert(select(2, table.concat(W.tipLines, "\n"):gsub("Maraudon", "")) >= 5, "one tooltip line per held entry")
+assert(item("next").wanted and item("next").state == "bad", "0 free: the countdown item, red: " .. tostring(item("next").value))
+assert(select(2, W.tooltip(item("slots")):gsub("Maraudon", "")) >= 5, "one tooltip line per held entry")
 -- on the bank alt: the main's slots
 LockoutDB.chars["Player-1-BANK"] = { entries = {}, last = {}, name = "Hero", level = 1 }
 local main = LockoutDB.chars["Player-1-ABC"]
@@ -40,8 +42,10 @@ function UnitLevel() return 1 end
 function IsInInstance() return false, "none" end
 ev:_fire("PLAYER_LOGIN")
 for _, t in ipairs(W.tickers) do t() end
-DeadbeatBar:_script("OnEnter")
-assert(table.concat(W.tipLines, "\n"):find("Instances · Hero 60"), "the main's slots on the alt: " .. table.concat(W.tipLines, " | "))
+assert(W.tooltip(item("slots")):find("Hero 60"), "the main's slots on the alt: " .. table.concat(W.tipLines, " | "))
+item("slots").frame:_script("OnClick", "LeftButton")
+assert(LockoutDB.bigOff, "clicking the diamonds hides the big indicator")
+item("slots").frame:_script("OnClick", "LeftButton")
 assert(LockoutBig, "big indicator on the alt")
 SlashCmdList.LOCKOUT("big")
 SlashCmdList.LOCKOUT("big")
