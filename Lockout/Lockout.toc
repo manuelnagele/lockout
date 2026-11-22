@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: Lockout
+## Notes: Instance entries left this hour (5) and today (30), and when the next one frees up.
+## Author: Manuel Nagele
+## Version: 1.0.0
+## SavedVariables: LockoutDB
+## OptionalDeps: Deadbeat
+
+Core.lua
+Lockout.lua

@@ -21,6 +21,25 @@ jobs:
         with:
           repository: manuelnagele/deadbeat-spec
           path: deadbeat-spec
+      - name: TOC lists real files and carries the code's version
+        working-directory: self
+        run: |
+          A=Lockout; toc="$A/$A.toc"
+          test -s "$toc" || { echo "::error::$toc is empty"; exit 1; }
+          grep -q '^## Interface:' "$toc" || { echo "::error::$toc has no Interface line"; exit 1; }
+          v=$(sed -n 's/^## Version: *//p' "$toc" | tr -d '\r')
+          [ -n "$v" ] || { echo "::error::$toc has no Version"; exit 1; }
+          n=0
+          while IFS= read -r f; do
+            f=${f%$'\r'}
+            case "$f" in ''|'#'*) continue;; esac
+            n=$((n+1))
+            [ -f "$A/$f" ] || { echo "::error::$toc lists $f, which doesn't exist"; exit 1; }
+          done < "$toc"
+          [ "$n" -gt 0 ] || { echo "::error::$toc lists no files"; exit 1; }
+          if grep -q 'local VERSION = ' "$A"/*.lua; then
+            grep -q "local VERSION = \"$v\"" "$A"/*.lua || { echo "::error::$toc says $v, the code's VERSION differs"; exit 1; }
+          fi
       - name: Install LuaJIT
         run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit
       - name: Unit tests
