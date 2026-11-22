@@ -1,0 +1,26 @@
+name: test
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: self
+      # the smoke test loads the hub from ../deadbeat
+      - uses: actions/checkout@v4
+        with:
+          repository: manuelnagele/deadbeat
+          path: deadbeat
+      - name: Install LuaJIT
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit
+      - name: Unit tests
+        working-directory: self
+        run: luajit tests/run.lua
+      - name: Smoke test (on the hub)
+        working-directory: self
+        run: luajit tests/smoke.lua

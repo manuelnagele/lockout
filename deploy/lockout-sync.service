@@ -1,0 +1,12 @@
+[Unit]
+Description=Lockout — follow origin/main, relink the addon, notify on change
+After=network-online.target
+
+[Service]
+ExecStart=@REPO@/deploy/lockout-sync.sh
+Environment=LOCKOUT_REPO=@REPO@
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

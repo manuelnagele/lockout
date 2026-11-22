@@ -1,0 +1,34 @@
+name: release
+# Push a tag vX.Y.Z (matching the TOC's ## Version) and this packages the addon folder as a zip on GitHub Releases,
+# with the commits since the previous tag as the notes.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      ADDON: Lockout
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: The tag matches the TOC version
+        run: |
+          toc=$(grep -m1 '^## Version:' "$ADDON/$ADDON.toc" | sed 's/## Version: *//; s/\r//')
+          [ "v$toc" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME but $ADDON.toc says $toc"; exit 1; }
+      - name: Package
+        run: zip -qr "$ADDON-$GITHUB_REF_NAME.zip" "$ADDON" -x '*.DS_Store'
+      - name: Release notes
+        run: |
+          prev=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          { echo "## Changes"; git log ${prev:+$prev..}"$GITHUB_REF_NAME" --no-merges --pretty='- %s'; echo;
+            echo "Install: unzip into \`World of Warcraft/_forever_/Interface/AddOns/\`."; } > notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$ADDON-$GITHUB_REF_NAME.zip" --title "$ADDON ${GITHUB_REF_NAME#v}" --notes-file notes.md
