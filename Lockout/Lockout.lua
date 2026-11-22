@@ -1,8 +1,8 @@
 -- Lockout: instance entries in the rolling hour (5) and day (30), per character.
--- Public API for other addons: Lockout.Status() -> see Core.status. A Deadbeat module (spec 0.1).
+-- Public API for other addons: Lockout.Status() -> see Core.status. A Deadbeat module (spec 2.0).
 local ADDON, ns = ...
 local Core = ns.Core
-local VERSION = "0.9.0"
+local VERSION = "1.0.0"
 
 local db, char
 local current          -- zone name of the instance we're in, or nil
@@ -10,7 +10,8 @@ local active           -- the entry for the instance we're in: its .seen follows
 local resetPatterns = {}
 local tooMany = {}
 local line             -- own text line, only without Deadbeat
-local badge            -- Deadbeat badge: five diamonds, lit = free this hour
+local badge            -- Deadbeat widget: five diamonds, lit = free this hour
+local nextItem         -- Deadbeat item: the countdown to the next free slot (with 1 or 0 left)
 local PIPS, PIP = 5, 7
 
 Lockout = {}
@@ -77,20 +78,13 @@ local function drawPips()
         pip:SetVertexColor(c[1], c[2], c[3], 1)
         pip.glow:Stop()
     end
-    -- with 1 or 0 left: a live countdown to the next free slot beside the diamonds
-    if badge.countdown then
-        local K = Deadbeat.kit
+    -- with 1 or 0 left (or while watching another character): the countdown to the next free slot, as an item
+    if nextItem then
         if (s.hourLeft <= 1 or other) and s.nextFree then
-            local c = s.hourLeft == 0 and K.RED or P.bronze4
-            local text = "|TInterface\\Icons\\INV_Misc_PocketWatch_01:12:12:0:0:64:64:5:59:5:59|t " ..
-                ("|cff%s%s%s|r"):format(K.hex(c), s.estimated and "~" or "", Core.countdown(s.nextFree - now))
-            if other then text = ("|cff%s%s|r  "):format(K.hex(P.warmGrey), label(who)) .. text end
-            badge.countdown:SetText(text)
-            local w = PIPS * (PIP + 4) + (other and 112 or 62)
-            if badge:GetWidth() ~= w then badge:SetWidth(w) badge.wide = true Deadbeat.Refresh() end
-        elseif badge.wide then
-            badge.countdown:SetText("")
-            badge:SetWidth(PIPS * (PIP + 4)) badge.wide = false Deadbeat.Refresh()
+            nextItem:Set((s.estimated and "~" or "") .. Core.countdown(s.nextFree - now), s.hourLeft == 0 and "bad" or "warn")
+            nextItem:Show()
+        else
+            nextItem:Hide()
         end
     end
     -- the slot that frees up next breathes in its last 5 minutes
@@ -313,29 +307,27 @@ end
 
 local function section(tip)
     if not char then return end
-    if Deadbeat.Context and Deadbeat.Context() == "raid" then return end   -- raids have their own (weekly) lockouts
-    charLines(tip, char, "Instances")
+    charLines(tip, char, "  This character")
     local t = now()
     for _, c in pairs(db.chars) do
-        if c ~= char and #Core.held(c.entries or {}, t) > 0 then charLines(tip, c, "Instances · " .. label(c)) end
+        if c ~= char and #Core.held(c.entries or {}, t) > 0 then charLines(tip, c, "  " .. label(c)) end
     end
 end
 
 local function buildDisplay()
-    if Deadbeat then
-        local m = Deadbeat.Register("Lockout", 20, { spec = "0.1" })
-        if m.Options then
-            m:Options({ title = "Lockout", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", rows = {
-                { kind = "header", label = "Instance lockouts" },
-                { kind = "toggle", label = "Big green/red indicator", get = function() return not db.bigOff end,
-                  set = function(on) db.bigOff = not on refresh() end },
-                { kind = "note", label = "Shift-drag the big indicator to move it." },
-                { kind = "button", label = "Forget this character's lockouts", text = "Clear", confirm = true,
-                  run = function() SlashCmdList.LOCKOUT("clear") end },
-            } })
-        end
-        badge = m:Badge(PIPS * (PIP + 4), { id = "lockout.pips", label = "Instance lockouts (5 per hour)",
-            contexts = { farm = true, dungeon = true, city = true, world = true } })
+    if Deadbeat and Deadbeat.SPEC and Deadbeat.SPEC >= "2.0" then
+        local icon = "Interface\\Icons\\INV_Misc_PocketWatch_01"
+        local m = Deadbeat.Register("Lockout", { icon = icon, spec = "2.0" })
+        local places = { farm = true, dungeon = true, city = true, world = true }   -- raids have weekly lockouts
+        m:Options({ title = "Lockout", icon = icon, rows = {
+            { kind = "header", label = "Instance lockouts" },
+            { kind = "toggle", label = "Big green/red indicator", get = function() return not db.bigOff end,
+              set = function(on) db.bigOff = not on refresh() end },
+            { kind = "note", label = "Shift-drag the big indicator to move it. Clicking the diamonds shows or hides it too." },
+            { kind = "button", label = "Forget this character's lockouts", text = "Clear", confirm = true,
+              run = function() SlashCmdList.LOCKOUT("clear") end },
+        } })
+        badge = m:Widget("slots", { name = "Slots this hour", width = PIPS * (PIP + 4), contexts = places })
         badge.pips = {}
         for i = 1, PIPS do
             local pip = badge:CreateTexture(nil, "ARTWORK")
@@ -350,9 +342,10 @@ local function buildDisplay()
             pip.glow = glow
             badge.pips[i] = pip
         end
-        badge.countdown = badge:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        badge.countdown:SetPoint("RIGHT", badge.pips[1], "LEFT", -8, 0)
-        m:Section(section)
+        nextItem = m:Item("next", { name = "Next free slot", icon = icon, contexts = places })
+        m:Tooltip(function(tip) section(tip) end)
+        m:Click(function() db.bigOff = not db.bigOff refresh() end,
+            function() return db.bigOff and "show the big indicator" or "hide the big indicator" end)
         return
     end
     line = CreateFrame("Frame", "LockoutLine", UIParent)

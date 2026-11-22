@@ -6,8 +6,9 @@ when the next slot frees, so a reset doesn't put you outside the dungeon.
 
 ## What it shows
 
-- **Five diamonds** on [Deadbeat](https://github.com/manuelnagele/deadbeat)'s bar: one per slot this hour, lit when
-  free. With 1 or 0 left, a live countdown to the next free slot.
+- **Five diamonds** on [Deadbeat](https://github.com/manuelnagele/deadbeat)'s bar (2.0 or later): one per slot this
+  hour, lit when free. Click them to show or hide the big indicator.
+- **Next free slot:** with 1 or 0 left, a second item counts down to the next free slot (gold, red at 0).
 - **A big green/red indicator** you can place anywhere (shift-drag): green when a slot is free, red when you'd have
   to wait. Made for waiting on an alt while your main's instances reset.
 - **The tooltip:** every entry still holding a slot, with the time it frees; your other characters' slots too.
@@ -25,8 +26,8 @@ when the next slot frees, so a reset doesn't put you outside the dungeon.
 
 ## Settings
 
-The gear on Deadbeat's bar → **Lockout**: the big indicator on/off, forget this character's lockouts. Which places the
-diamonds show in: Deadbeat's Bar page. Commands: `/lockout` (this hour's entries) · `/lockout debug`.
+Right-click the diamonds (or the gear → **Lockout**): the big indicator on/off, forget this character's lockouts.
+Which places they show in: Deadbeat's Bar page or edit mode. Not in raids by default: raids have weekly lockouts. Commands: `/lockout` (this hour's entries) · `/lockout debug`.
 
 Without Deadbeat, Lockout still counts and shows a line under the minimap.
 
