@@ -42,7 +42,7 @@ Copy the `Lockout` folder into `World of Warcraft/_forever_/Interface/AddOns/`. 
 
 ```
 luajit tests/run.lua                 # the counting rules
-luajit tests/smoke.lua               # the whole addon on Deadbeat (needs ../deadbeat)
+luajit tests/smoke.lua               # the whole addon on Deadbeat (needs ../deadbeat and ../deadbeat-spec)
 ```
 Releases: push a tag `vX.Y.Z` matching the TOC's version; CI packages the zip onto GitHub Releases.
 `deploy/` is the author's Linux setup that keeps a game install in sync with this repo (optional).

@@ -1,9 +1,6 @@
--- luajit tests/smoke.lua: Lockout on Deadbeat (sibling repo) against the shared WoW stub.
-local W = dofile("../deadbeat/tests/wowstub.lua")
-local dns = {}
-for _, f in ipairs({ "../deadbeat/Deadbeat/Kit.lua", "../deadbeat/Deadbeat/Deadbeat.lua", "../deadbeat/Deadbeat/Settings.lua" }) do assert(loadfile(f))("Deadbeat", dns) end
-W.frames[#W.frames]:_fire("ADDON_LOADED", "Deadbeat")
-W.frames[#W.frames]:_fire("PLAYER_LOGIN")
+-- luajit tests/smoke.lua: Lockout on Deadbeat (sibling repo) on the shared harness (deadbeat-spec).
+local W = dofile(os.getenv("HARNESS") or "../deadbeat-spec/harness/wowstub.lua")   -- the shared harness
+W.loadDeadbeat(os.getenv("DEADBEAT") or "../deadbeat")
 function GetServerTime() return os.time() end
 function UnitName() return "Hero" end
 function UnitLevel() return 60 end
