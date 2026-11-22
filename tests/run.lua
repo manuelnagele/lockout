@@ -67,5 +67,17 @@ do
     check("backfill: ends at the next entry", real[1].seen == 1795280347)
 end
 
+-- the daily limit (30 in 24 h): no entry until the day's oldest one is 24 h old, whatever the hour says
+local t0 = 1795300000
+local daily = {}
+for i = 1, 30 do daily[i] = { t = t0 - 23 * 3600 + i * 60, zone = "Maraudon" } end   -- 30 in the last day, none this hour
+local ds = Core.status(daily, t0)
+check("30 today: none left today", ds.dayLeft == 0 and ds.hourLeft == 5)
+check("frees 24 h after the oldest", ds.dayFree == daily[1].t + Core.DAY + Core.MARGIN)
+local free, at, why = Core.verdict(ds)
+check("the day wins over a free hour", free == false and why == "day" and at == ds.dayFree)
+local ok2 = Core.verdict(Core.status({}, t0))
+check("nothing used: free", ok2 == true)
+
 print(failures == 0 and "all passed" or (failures .. " failed"))
 os.exit(failures == 0 and 0 or 1)
